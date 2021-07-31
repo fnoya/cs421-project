@@ -1,0 +1,273 @@
+%%\documentclass{sigkddExp}
+\documentclass[journal,onecolumn]{IEEEtran}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{color}
+\usepackage{makecell}
+
+\renewcommand\theadalign{bc}
+\renewcommand\theadfont{\bfseries}
+\renewcommand\theadgape{\Gape[4pt]}
+\renewcommand\cellgape{\Gape[4pt]}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+  language=Haskell,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  breaklines=true,
+  frame=false,
+  breakatwhitespace=true,
+  tabsize=3
+}
+
+\begin{document}
+
+% -- Can be completely blank or contain 'commented' information like this...
+%\conferenceinfo{WOODSTOCK}{'97 El Paso, Texas USA} % If you happen to know the conference location etc.
+%\CopyrightYear{2001} % Allows a non-default  copyright year  to be 'entered' - IF NEED BE.
+%\crdata{0-12345-67-8/90/01}  % Allows non-default copyright data to be 'entered' - IF NEED BE.
+% --- End of author Metadata ---
+
+\title{Improving the performance of the puzzle ``Escape from Zurg'' by applying pruning methods}
+%\subtitle{[Extended Abstract]
+% You need the command \numberofauthors to handle the "boxing"
+% and alignment of the authors under the title, and to add
+% a section for authors number 4 through n.
+%
+% Up to the first three authors are aligned under the title;
+% use the \alignauthor commands below to handle those names
+% and affiliations. Add names, affiliations, addresses for
+% additional authors as the argument to \additionalauthors;
+% these will be set for you without further effort on your
+% part as the last section in the body of your article BEFORE
+% References or any Appendices.
+
+%\numberofauthors{1}
+%
+% You can go ahead and credit authors number 4+ here;
+% their names will appear in a section called
+% "Additional Authors" just before the Appendices
+% (if there are any) or Bibliography (if there
+% aren't)
+
+% Put no more than the first THREE authors in the \author command
+%%You are free to format the authors in alternate ways if you have more 
+%%than three authors.
+
+\author{
+%
+% The command \alignauthor (no curly braces needed) should
+% precede each author name, affiliation/snail-mail address and
+% e-mail address. Additionally, tag each line of
+% affiliation/address with \affaddr, and tag the
+%% e-mail address with \email.
+% \alignauthor Olabisi Balogun\\
+%        \email{olb2@illinois.edu}
+% \alignauthor Jorge Flores\\
+%        \email{jorgedf2@illinois.edu}
+ Francisco Noya
+
+ \textit{fnoya2@illinois.edu}
+}
+\date{30 Jul 2021}
+\maketitle
+\begin{abstract}\normalsize
+ Reducing the search space is critical for search programs that have to deal with
+ spaces that tend to grow exponentially. Functional programming can produce elegant
+ algorithms that can benefit from features of modern functional languages such as
+ lazy data structures. Using the ``Escape from Zurg'' puzzle, I converted the original exhaustive
+ search algorithm into a more efficient version by means of two pruning methods based on
+ a lazy data structure called \textit{improving sequence}.
+
+ After applying these techniques the running time for finding the optimal
+ solution was slashed by over 20 times and the amount of memory used was
+ reduced by 95\%.
+\end{abstract}
+
+
+\section{Overview}
+The Haskell implementation presented in the original ``Escape from Zurg'' paper (\cite{erwing}) constructs 
+an exhaustive search space with all possible configurations of the elements of the problem.  This is done by extending the search tree with a function that generates every alternative from each intermediate node.  Each node (or state) is paired with the list of moves that leads to it. The state itself is represented by a tuple containing the position of the flashlight (\textsc{L} or \textsc{R}) and the elements (toys) that are still on the left side of the bridge (where Zurg is). 
+
+The construction of the search space takes advantage of Haskell list comprehension and lazy evaluation features to terminate without an explicit terminating condition.  This space is subsequently filtered with the \textsf{isSolution} predicate to select those paths that lead to the goal within the given constraint (\textsc{$duration \le 60$}). 
+
+This approach of solving the problem is clear and concise but it is also very inefficient.  For example, with the original implementation and setup 108 paths are generated and evaluated but only two of them satisfy the duration constraint. To circumvent this problem, I decided to include a technique that would early prune those paths that will not lead to the goal because their partial durations are already over the threshold. 
+
+The objective of search problems of this kind is to find the least cost to reach the goal from an initial state.  A common characteristic of these problems is that the cost function grows monotonically along the depth of the search tree. This property can be use for pruning.
+
+\textit{Improving sequences} are lazy data structures that consist of a monotonical sequence of approximation values that are gradually improved on the basis of some ordering relation as they approach the final value (\cite{iwasaki}). These approximating values are usually generated during the computations but rarely used.  For example, to obtain the length of an array, the function uses an accumulator that gradually approaches the final result.  If the intent of the programmer was to evaluate the expression \textsf{1 \textless length [1..100]} the \textsf{length} will inefficiently iterate one hundred times before returning the value \textsf{100}.  The idea behind \textit{improving sequences} is that if an intermediate value of some expression has sufficient information to yield the result of an outer expression, further computations that generate unnecessary values are pruned.
+
+I applied this idea to the ``Escape from Zurg'' problem to prune the branches of the search tree whose intermediate durations were already over a threshold.  In fact, I adapted the algorithm to find the paths of minimum duration or cost that solve the problem.  The implementation was based on Morimoto et al. (\cite{morimoto}) and is summarized in the following section.
+
+
+\section{Implementation}
+\textit{Improving sequences} are defined as the following sum data type in Haskell:
+\begin{lstlisting}
+       data  IS a = a :? IS a | E deriving (Eq, Show)
+\end{lstlisting}
+
+The sequence consists of gradually improving values.  The sequence could be infinite but, if finite, \textsf{E} represents the terminal symbol that indicates that the current value cannot be further improved.  For example, \textsf{1 :? 2 :? 3 :? E} denotes a sequence in which \textsc{3} is the most improved value.
+
+For example, a redefined \textsf{length} function that makes use of an improving sequence will have the following definition.
+\begin{lstlisting}
+       length :: [a] -> a -> IS a
+       length [] n = n :? E
+       length (x:xs) n = n :? IS.length xs (n+1)
+\end{lstlisting}
+
+Special binary relations are also needed to make the IS type useful. 
+\begin{lstlisting}
+       (.<) :: Ord a => a -> IS a -> Bool
+       n .< E = False
+       n .< (x :? xs) = (n < x) || (n .< xs)
+\end{lstlisting}
+
+The advantages in efficiency of IS are obvious when measuring the time and memory needed to compare the length of a large list against 1.
+\begin{lstlisting}
+       *Zurg> s=[1..10000000000]
+       
+       *Zurg> 1 < Prelude.length s
+       True
+       (162.96 secs, 720,000,052,040 bytes)
+       
+       *Zurg> 1 .< IS.length s 0  
+       True
+       (0.01 secs, 53,272 bytes)
+\end{lstlisting}
+
+Before applying IS to the ``Escape from Zurg'' puzzle I defined a new \textsf{search} function whose purpose is to find the shortest time or minimum duration to achieve the goal.  Without using IS this function has the following definition.
+\begin{lstlisting}
+       search :: ([m],s) -> Int
+       search (ms,state)
+                   | isGoal (ms,state) = cost (ms,state)
+                   | otherwise = minimum [search (moves : ms,ss) | (moves,ss) <- trans state ]
+\end{lstlisting}
+
+The \textsf{cost} function is just the cumulative duration of the moves required to attain the given state. The \textsf{isGoal} function is just the result of comparing the given state with the desired final state \textsf{(R,[])}.
+
+To use IS in this problem, we first need to define a new \textsf{minimum} function based on IS.
+\begin{lstlisting}
+       minimum :: Ord a => [IS a] -> IS a
+       minimum = foldl1 minB
+
+       minB :: Ord a => IS a -> IS a -> IS a
+       minB E ys = E
+       minB xs E = E
+       minB xxs@(x :? xs) yys@(y :? ys)
+              | x == y = x :? minB xs ys
+              | x < y = x :? minB xs yys
+              | otherwise  = y :? minB xxs ys
+\end{lstlisting}
+
+The new \textsf{searchIS} function based on IS has the following form.
+\begin{lstlisting} 
+       searchIS ::  ([m],s) -> IS Int
+       searchIS (ms,state)
+                   | isGoal (ms,state)= cost (ms,state) :? E
+                   | otherwise = cost (ms,state) :? IS.minimum [searchIS (moves : ms, ss) | (moves,ss) <- trans state]
+\end{lstlisting}
+
+When evaluating the minimum cost between two search tree branches, the computations are pruned when the end of the IS with the minimal value is reached.  States further along a branch that has an intermediate cost already higher than the final value of another path are not even explored saving time and resources.  This turns out to be an implementation of Dijkstra’s single-source shortest-path
+search algorithm (\cite{dijkstra}).
+
+However, in this implementation computation are only terminated when the end of an IS is reached.  However, it could be possible that the intermediate value of the branch is already higher than the current global minimum.  In this case, efficiency would be gained if the exploration of that branch could be terminated early.  By introducing an upper bound to the search function and rewriting the minimum function as a continuation, we could achieve this objective.
+\begin{lstlisting}
+       searchD :: ([m],s) -> IS Int
+       searchD (ms, state) =  searchD' (ms,state) (maxBound :? E)
+          where
+            searchD' (ms,state) u
+                        | isGoal (ms,state) = cost (ms,state) :? E
+                        | otherwise = cost (ms,state) :? IS.minimumD u [searchD' (moves : ms, ss) | (moves,ss) <- trans state]
+
+       minimumD :: Ord a => IS a -> [IS a -> IS a] -> IS a
+       minimumD = foldl dfbb
+       
+       dfbb :: Ord a => IS a -> (IS a -> IS a) -> IS a
+       dfbb u f = finalize (minB u (f u))
+
+       finalize :: Ord a => IS a -> IS a
+       finalize (x :? E) = x :? E
+       finalize (x :? xs) = finalize xs
+\end{lstlisting}
+
+The \textsf{finalize} function just returns the most improved value of the IS.  The global minimum is kept as a short IS of the form \textsf{x :? E} where \textsf{x} is the minimum and as such is fed into \textsf{minB}.
+
+This is an implementation of a Depth-First Branch-and-Bound search algorithm.
+
+\section{Tests}
+
+The three search algorithms (search, searchIS, and searchD) were applied to solve the original puzzle with 4 toys as well as more difficult versions with 5 to 8 toys.  The following table summarizes the definitions for each toy: name and cost (the time that it takes to cross the bridge).
+
+\begin{table}[h]
+       \centering
+       \caption{Definition of toys used in the experiments}
+       \label{tab:toys}
+       \begin{tabular}{l|c} \hline
+       \thead{Toy name}&\thead{Time to\\cross}\\ \hline
+       Buzz&5\\ \hline
+       Woody&10\\ \hline
+       Rex&20\\ \hline
+       Hamm&25\\ \hline
+       T1&11\\ \hline
+       T2&13\\ \hline
+       T3&14\\ \hline
+       T4&15\\ \hline
+       \end{tabular}
+\end{table}
+
+The time and memory consumed on each run for each algorithm are presented in the following table.
+
+\begin{table}[h]
+       \centering
+       \caption{Time and memory consumed on each run}
+       \label{tab:results}
+       \begin{tabular}{c|c|c|c} \hline
+       \thead{No. of toys}&\thead{search}&\thead{searchIS}&\thead{searchD}\\ \hline
+       4&\makecell{0.02s\\0.6 Mb}&\makecell{0.01s\\0.5 Mb}&\makecell{0.01s\\0.5 Mb}\\ \hline
+       5&\makecell{0.16s\\24 Mb}&\makecell{0.08s\\12 Mb}&\makecell{0.05s\\12 Mb}\\ \hline
+       6&\makecell{7.8s\\2 Gb}&\makecell{1.6s\\0.4 Gb}&\makecell{1.3s\\0.4 Gb}\\ \hline
+       7&\makecell{1011s\\288 Gb}&\makecell{115s\\22 Gb}&\makecell{60s\\23 Gb}\\ \hline
+       8&ND&ND&\makecell{5874s\\1.582 Gb}\\ \hline
+       \multicolumn {4}{l}{ND: Not done.}
+       \end{tabular}
+\end{table}
+
+\section{Conclusions}
+
+The use of \texit{improving sequences} has shown to produce much better solutions for the original puzzle in terms of overall efficiency.  This comes directly for the ability to prune branches of the search tree that are incapable of producing the goal at a lower cost.
+Functional programming produce concise and elegant code to represents this algorithms.  In addition, Haskell lazy evaluation and pattern matching also helps in terms of efficiency and clarity.
+
+\section{Code Repository}
+\begin{itemize}
+       \item \href{https://github.com/fnoya/dlh-project}{Github}
+       \item \href{https://drive.google.com/drive/folders/1KMSbvsonOh3s8L902e-ExIgh_IgH0VnV?usp=sharing}{Google Drive}: data processing files included, *.p, *.npy.
+\end{itemize}
+
+\begin{thebibliography}{6}
+       \bibitem{dijkstra}
+       Dijkstra, E. W.. (1959). ``A note on two problems in connexion with graphs''. \textit{Numerische Mathematik}, 1(1), 269–271. \url{https://doi.org/10.1007/bf01386390}
+       \bibitem{erwing}
+       Erwing, M. (2004). ``Escape from Zurg: An Exercise in Logic Programming''. \textit{Journal of Functional Programming}, 14(3), 253-261.
+       \bibitem{iwasaki}
+       Iwasaki, H., Morimoto, T., \& Takano, Y. (2011). ``Pruning with improving sequences in lazy functional programs''. \textit{Higher-order and Symbolic Computation} (formerly LISP and Symbolic Computation), 24(4), 281–309. \url{https://doi.org/10.1007/s10990-012-9086-3}
+       \bibitem{morimoto}
+       Morimoto, T., Takano, Y., \& Iwasaki, H. (2006). ``Instantly Turning a Naive Exhaustive Search into Three Efficient Searches with Pruning''. \textit{In} Lecture Notes in Computer Science (pp. 65–79). \url{https://doi.org/10.1007/978-3-540-69611-7_4}
+
+\end{thebibliography}
+              
+\end{document}

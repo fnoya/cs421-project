@@ -1,0 +1,29 @@
+name:                project
+version:             0.1.0.0
+synopsis:            Extend escape from Zurg
+license:             NCSA
+author:              "Francisco Noya"
+maintainer:          "fnoya2@illinois.edu"
+copyright:           ""
+
+
+description:         Please see the README
+
+dependencies:
+- base >= 4.7 && < 5
+- unordered-containers >= 0.2
+- timeit
+
+
+
+executables:
+  project:
+    main: Main.hs
+    source-dirs: app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+
+
+

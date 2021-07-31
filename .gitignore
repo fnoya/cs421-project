@@ -1,0 +1,8 @@
+stack.yaml.lock
+*.cls
+*.synctex*
+/app/.stack-work/
+.stack-work/
+project.cabal
+/app/stack.yaml
+stack.yaml
