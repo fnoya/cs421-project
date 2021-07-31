@@ -7,4 +7,4 @@ Run with
 stack ghci app/Main.hs
 ```
 
-Please read [Final project.pdf](/Final%20project.pdf) for further information.
+Please read [Final project.pdf](./Final%20project.pdf) for further information.
