@@ -1,5 +1,5 @@
 %%\documentclass{sigkddExp}
-\documentclass[journal,onecolumn]{IEEEtran}
+\documentclass[journal,onecolumn,12pt]{IEEEtran}
 \usepackage{amsmath}
 \usepackage{graphicx}
 \usepackage{titlesec}
@@ -95,18 +95,18 @@
 
 
 \section{Overview}
-The Haskell implementation presented in the original ``Escape from Zurg'' paper (\cite{erwing}) constructs 
+The Haskell implementation presented in the original ``Escape from Zurg'' paper \cite{erwing} constructs 
 an exhaustive search space with all possible configurations of the elements of the problem.  This is done by extending the search tree with a function that generates every alternative from each intermediate node.  Each node (or state) is paired with the list of moves that leads to it. The state itself is represented by a tuple containing the position of the flashlight (\textsc{L} or \textsc{R}) and the elements (toys) that are still on the left side of the bridge (where Zurg is). 
 
-The construction of the search space takes advantage of Haskell list comprehension and lazy evaluation features to terminate without an explicit terminating condition.  This space is subsequently filtered with the \textsf{isSolution} predicate to select those paths that lead to the goal within the given constraint (\textsc{$duration \le 60$}). 
+The construction of the search space takes advantage of Haskell list comprehension and lazy evaluation features to terminate without an explicit terminating condition.  This space is subsequently filtered with the $\mathsf{isSolution}$ predicate to select those paths that lead to the goal within the given constraint (\textsc{$duration \le 60$}). 
 
 This approach of solving the problem is clear and concise but it is also very inefficient.  For example, with the original implementation and setup 108 paths are generated and evaluated but only two of them satisfy the duration constraint. To circumvent this problem, I decided to include a technique that would early prune those paths that will not lead to the goal because their partial durations are already over the threshold. 
 
-The objective of search problems of this kind is to find the least cost to reach the goal from an initial state.  A common characteristic of these problems is that the cost function grows monotonically along the depth of the search tree. This property can be use for pruning.
+The objective of search problems of this kind is to find the least cost to reach the goal from an initial state.  A common characteristic of these problems is that the cost function grows monotonically along the depth of the search tree. This property can be use for pruning.  The cost of a certain path can be viewed as a function that by approximation reaches its final value. In many everyday tasks these approximating values are usually generated but rarely used.  For example, to obtain the length of an array, the function uses an accumulator that gradually approaches the final result.  If the intent of the programmer was to evaluate the expression $\mathsf{1 \textless length [1..100]}$ the $\mathsf{length}$ will inefficiently iterate one hundred times before returning the value $\mathsf{100}$.
 
-\textit{Improving sequences} are lazy data structures that consist of a monotonical sequence of approximation values that are gradually improved on the basis of some ordering relation as they approach the final value (\cite{iwasaki}). These approximating values are usually generated during the computations but rarely used.  For example, to obtain the length of an array, the function uses an accumulator that gradually approaches the final result.  If the intent of the programmer was to evaluate the expression \textsf{1 \textless length [1..100]} the \textsf{length} will inefficiently iterate one hundred times before returning the value \textsf{100}.  The idea behind \textit{improving sequences} is that if an intermediate value of some expression has sufficient information to yield the result of an outer expression, further computations that generate unnecessary values are pruned.
+\textit{Improving sequences} are lazy data structures that consist of a monotonical sequence of approximating values that are gradually improved on the basis of some ordering relation as they approach the final result \cite{iwasaki}.   The idea behind \textit{improving sequences} is that if an intermediate value of some expression has sufficient information to yield the result of an outer expression, further unnecessary computations are omitted.  In the $\mathsf{length}$ example, only two iterations will be needed before returning the result of $\mathsf{1 \textless length [1..100]}$, instead of $100$.
 
-I applied this idea to the ``Escape from Zurg'' problem to prune the branches of the search tree whose intermediate durations were already over a threshold.  In fact, I adapted the algorithm to find the paths of minimum duration or cost that solve the problem.  The implementation was based on Morimoto et al. (\cite{morimoto}) and is summarized in the following section.
+I applied this idea to the ``Escape from Zurg'' problem to prune the branches of the search tree whose intermediate durations were already over a threshold.  In fact, I adapted the algorithm to find the paths of minimum duration or cost that solve the problem.  The implementation was based on Morimoto et al. \cite{morimoto} and is summarized in the following section.
 
 
 \section{Implementation}
@@ -115,9 +115,9 @@ I applied this idea to the ``Escape from Zurg'' problem to prune the branches of
        data  IS a = a :? IS a | E deriving (Eq, Show)
 \end{lstlisting}
 
-The sequence consists of gradually improving values.  The sequence could be infinite but, if finite, \textsf{E} represents the terminal symbol that indicates that the current value cannot be further improved.  For example, \textsf{1 :? 2 :? 3 :? E} denotes a sequence in which \textsc{3} is the most improved value.
+The sequence consists of gradually improving values.  The sequence could be infinite but, if finite, $\mathsf{E}$ represents the terminal symbol that indicates that the current value cannot be further improved.  For example, $\mathsf{1 :? 2 :? 3 :? E}$ denotes a sequence in which $3$ is the most improved value.
 
-For example, a redefined \textsf{length} function that makes use of an improving sequence will have the following definition.
+For example, a redefined $\mathsf{length}$ function that makes use of an improving sequence will have the following definition.
 \begin{lstlisting}
        length :: [a] -> a -> IS a
        length [] n = n :? E
@@ -144,7 +144,7 @@ The advantages in efficiency of IS are obvious when measuring the time and memor
        (0.01 secs, 53,272 bytes)
 \end{lstlisting}
 
-Before applying IS to the ``Escape from Zurg'' puzzle I defined a new \textsf{search} function whose purpose is to find the shortest time or minimum duration to achieve the goal.  Without using IS this function has the following definition.
+Before applying IS to the ``Escape from Zurg'' puzzle I defined a new $\mathsf{search}$ function whose purpose is to find the shortest time (i.e. minimum duration) to achieve the goal.  Without using IS this function has the following definition.
 \begin{lstlisting}
        search :: ([m],s) -> Int
        search (ms,state)
@@ -152,9 +152,9 @@ Before applying IS to the ``Escape from Zurg'' puzzle I defined a new \textsf{se
                    | otherwise = minimum [search (moves : ms,ss) | (moves,ss) <- trans state ]
 \end{lstlisting}
 
-The \textsf{cost} function is just the cumulative duration of the moves required to attain the given state. The \textsf{isGoal} function is just the result of comparing the given state with the desired final state \textsf{(R,[])}.
+The $\mathsf{cost}$ function is just the cumulative duration of the moves required to attain the given state. The $\mathsf{isGoal}$ function is just the result of comparing the given state with the desired final state $\mathsf{(R,[])}$.
 
-To use IS in this problem, we first need to define a new \textsf{minimum} function based on IS.
+To use IS in this problem, we first need to define a new $\mathsf{minimum}$ function based on IS.
 \begin{lstlisting}
        minimum :: Ord a => [IS a] -> IS a
        minimum = foldl1 minB
@@ -168,7 +168,7 @@ To use IS in this problem, we first need to define a new \textsf{minimum} functi
               | otherwise  = y :? minB xxs ys
 \end{lstlisting}
 
-The new \textsf{searchIS} function based on IS has the following form.
+The new $\mathsf{searchIS}$ function based on IS has the following form.
 \begin{lstlisting} 
        searchIS ::  ([m],s) -> IS Int
        searchIS (ms,state)
@@ -177,9 +177,9 @@ The new \textsf{searchIS} function based on IS has the following form.
 \end{lstlisting}
 
 When evaluating the minimum cost between two search tree branches, the computations are pruned when the end of the IS with the minimal value is reached.  States further along a branch that has an intermediate cost already higher than the final value of another path are not even explored saving time and resources.  This turns out to be an implementation of Dijkstra’s single-source shortest-path
-search algorithm (\cite{dijkstra}).
+search algorithm \cite{dijkstra}.
 
-However, in this implementation computation are only terminated when the end of an IS is reached.  However, it could be possible that the intermediate value of the branch is already higher than the current global minimum.  In this case, efficiency would be gained if the exploration of that branch could be terminated early.  By introducing an upper bound to the search function and rewriting the minimum function as a continuation, we could achieve this objective.
+In this implementation computations are only terminated when the end of an IS is reached.  However, when the intermediate value of a branch is already higher than the current global minimum, we know that that branch can be discarded because it is not going to lead to the optimum.  In this case, efficiency can be gained if the exploration is terminated earlier.  By introducing an upper bound to the search function and rewriting the minimum function as a continuation, we can achieve this improvement.
 \begin{lstlisting}
        searchD :: ([m],s) -> IS Int
        searchD (ms, state) =  searchD' (ms,state) (maxBound :? E)
@@ -199,13 +199,13 @@ However, in this implementation computation are only terminated when the end of 
        finalize (x :? xs) = finalize xs
 \end{lstlisting}
 
-The \textsf{finalize} function just returns the most improved value of the IS.  The global minimum is kept as a short IS of the form \textsf{x :? E} where \textsf{x} is the minimum and as such is fed into \textsf{minB}.
+The $\mathsf{finalize}$ function just returns the most improved value of the IS.  The global minimum is wrapped in a IS of the form $\mathsf{x :? E}$ where $\mathsf{x}$ is the current global minimum and as such is fed into $\mathsf{minB}$ for further comparisons.
 
-This is an implementation of a Depth-First Branch-and-Bound search algorithm.
+This is an implementation of the Depth-First Branch-and-Bound search algorithm.
 
 \section{Tests}
 
-The three search algorithms (search, searchIS, and searchD) were applied to solve the original puzzle with 4 toys as well as more difficult versions with 5 to 8 toys.  The following table summarizes the definitions for each toy: name and cost (the time that it takes to cross the bridge).
+The three search algorithms (search, searchIS, and searchD) were applied to solve the original puzzle with 4 toys as well as with more difficult versions with 5 to 8 toys.  The Table I summarizes the definitions for each toy: name and time that takes to cross the bridge.
 
 \begin{table}[h]
        \centering
@@ -224,7 +224,7 @@ The three search algorithms (search, searchIS, and searchD) were applied to solv
        \end{tabular}
 \end{table}
 
-The time and memory consumed on each run for each algorithm are presented in the following table.
+The time and memory consumed on each run for each algorithm are presented in Table II.
 
 \begin{table}[h]
        \centering
@@ -243,8 +243,8 @@ The time and memory consumed on each run for each algorithm are presented in the
 
 \section{Conclusions}
 
-The use of \textit{improving sequences} has shown to produce much better solutions for the original puzzle in terms of overall efficiency.  This comes directly for the ability to prune branches of the search tree that are incapable of producing the goal at a lower cost.
-Functional programming produce concise and elegant code to represents this algorithms.  In addition, Haskell lazy evaluation and pattern matching also helps in terms of efficiency and clarity.
+The use of \textit{improving sequences} has shown to produce much better solutions for the original puzzle in terms of overall efficiency.  This comes directly from the ability to prune branches of the search tree that are incapable of producing the goal at a lower cost.
+Functional programming produce concise and elegant code to represent these algorithms.  In addition, Haskell lazy evaluation and pattern matching provide additional computation efficiency and code clarity.
 
 \section{Code Repository}
 \begin{itemize}
